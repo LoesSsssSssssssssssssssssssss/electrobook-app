@@ -8,6 +8,24 @@ import Footer from '../components/Footer';
 const Book = () => {
   const { id } = useParams();
   const [textbooks, setTextbooks] = useState([]);
+  const [progress, setProgress] = useState([]);
+  const [userId, setUserId] = useState(0);
+
+  useEffect(() => {
+    const fetchUserId = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const response = await axios.get('http://localhost:5000/user/profile', {
+          headers: { Authorization: token },
+        });
+        const userId = response.data._id;
+        setUserId(userId);
+      } catch (error) {
+        console.error(error);
+      }
+    };
+    fetchUserId();
+  }, []);
 
   useEffect(() => {
     const fetchTopics = async () => {
@@ -23,6 +41,51 @@ const Book = () => {
     fetchTopics();
   }, [id]);
 
+  useEffect(() => {
+    if (!userId) return;
+    const fetchProgress = async () => {
+      try {
+        const response = await axios.get(
+          `http://localhost:5000/user/progressbook/${userId}/${id}`
+        );
+        setProgress(response.data.completedTopics);
+      } catch (error) {
+        console.error(error);
+      }
+    };
+    fetchProgress();
+  }, [userId, id]);
+
+  const addToCompletedTopics = async (userId, textbookId, topicId) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.post(
+        `http://localhost:5000/user/increaseProgress/${userId}/${id}`,
+        {
+          userId,
+          textbookId,
+          topicId,
+        },
+        {
+          headers: {
+            Authorization: token,
+          },
+        }
+      );
+      if (response.status === 200) {
+        // Обновите состояние или выполните другие действия при успешном добавлении темы в список пройденных
+      }
+    } catch (error) {
+      console.error(error);
+      // Обработка ошибки, если добавление темы в список пройденных не удалось
+    }
+  };
+
+  // Обработчик события для нажатия на тему учебника
+  const handleTopicClick = (userId, textbookId, topicId) => {
+    addToCompletedTopics(userId, textbookId, topicId);
+  };
+
   return (
     <>
       <Header />
@@ -33,10 +96,21 @@ const Book = () => {
           <div className="progress_row">
             <div className="progress">
               <div className="progress_title">Прогресс</div>
-              <progress max="38" value="24"></progress>
+              {Array.isArray(textbooks.topics) &&
+                textbooks.topics.length > 0 && (
+                  <progress
+                    max={textbooks.topics.length}
+                    value={progress.length}
+                  ></progress>
+                )}
+              {/* Используем общее количество тем */}
               <div className="progress_span">
-                <span>24</span>
-                <span>38</span>
+                <span>{progress.length}</span>
+                <span>
+                  {Array.isArray(textbooks.topics)
+                    ? textbooks.topics.length
+                    : 0}
+                </span>
               </div>
             </div>
             <button className="test_btn">Пройти тест</button>
@@ -51,6 +125,14 @@ const Book = () => {
                     <li key={index}>
                       <Link
                         to={`/textbooks/books/${textbooks._id}/topics/${index}`}
+                        onClick={() =>
+                          handleTopicClick(userId, textbooks._id, topic._id)
+                        }
+                        style={{
+                          color: progress.includes(topic._id)
+                            ? 'purple'
+                            : 'inherit',
+                        }}
                       >
                         {topic.title}
                       </Link>

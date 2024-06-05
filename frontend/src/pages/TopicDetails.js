@@ -2,20 +2,53 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { materialDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
 import HeaderPhone from '../components/HeaderPhone';
 import Footer from '../components/Footer';
 
 function TopicDetails() {
+  const navigate = useNavigate();
   const { textbookId, topicIndex } = useParams();
   const [topic, setTopic] = useState(null);
   const [message, setMessage] = useState('');
+  const [userId, setUserId] = useState(0);
+  const [textbooks, setTextbooks] = useState([]);
+
+  useEffect(() => {
+    const fetchUserId = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const response = await axios.get('http://localhost:5000/user/profile', {
+          headers: { Authorization: token },
+        });
+        const userId = response.data._id;
+        setUserId(userId);
+      } catch (error) {
+        console.error(error);
+      }
+    };
+    fetchUserId();
+  }, []);
+
+  useEffect(() => {
+    const fetchTextbook = async () => {
+      try {
+        const response = await axios.get(
+          `http://localhost:5000/textbooks/books/${textbookId}`
+        );
+        setTextbooks(response.data);
+      } catch (error) {
+        console.error(error);
+      }
+    };
+    fetchTextbook();
+  }, [textbookId]);
 
   useEffect(() => {
     const fetchTopic = async () => {
       if (!textbookId || !topicIndex) {
-        return; // Проверяем наличие textbookId и topicIndex перед отправкой запроса
+        return;
       }
 
       try {
@@ -30,7 +63,37 @@ function TopicDetails() {
     };
 
     fetchTopic();
-  }, [textbookId, topicIndex]); // Зависимость изменяется при изменении textbookId и topicIndex
+  }, [textbookId, topicIndex]);
+
+  useEffect(() => {
+    const addToCompletedTopics = async () => {
+      if (userId === 0) {
+        return;
+      }
+
+      try {
+        const token = localStorage.getItem('token');
+        const topicId = topic._id;
+        await axios.post(
+          `http://localhost:5000/user/increaseProgress/${userId}/${textbookId}`,
+          {
+            userId,
+            textbookId,
+            topicId,
+          },
+          {
+            headers: {
+              Authorization: token,
+            },
+          }
+        );
+      } catch (error) {
+        console.error(error);
+      }
+    };
+
+    addToCompletedTopics();
+  }, [userId, topic, textbookId]);
 
   const renderContentWithCodeHighlighting = (content) => {
     const parts = content.split(/\{code\}(.*?)\{\/code\}/gs);
@@ -55,6 +118,25 @@ function TopicDetails() {
   if (!topic) {
     return <div>{message}</div>;
   }
+
+  const handlePrevClick = () => {
+    const prevTopicIndex = parseInt(topicIndex) - 1;
+    if (prevTopicIndex >= 0) {
+      navigate(`/textbooks/books/${textbookId}/topics/${prevTopicIndex}`);
+    } else {
+      navigate(`/book/${textbookId}`);
+    }
+  };
+
+  const handleNextClick = () => {
+    const nextTopicIndex = parseInt(topicIndex) + 1;
+    const totalTopics = textbooks.topics.length;
+    if (nextTopicIndex < totalTopics) {
+      navigate(`/textbooks/books/${textbookId}/topics/${nextTopicIndex}`);
+    } else {
+      navigate(`/book/${textbookId}`);
+    }
+  };
 
   return (
     <>
@@ -122,15 +204,13 @@ function TopicDetails() {
             </p>
           </div> */}
           <div className="book_btn">
-            <button className="prev_btn">
+            <button className="prev_btn" onClick={handlePrevClick}>
               <span>
                 <img src="/img/arrow_left.png" alt="" />
-                <p>
-                  <a href="book_javascript.html">Назад</a>
-                </p>
+                <p>Назад</p>
               </span>
             </button>
-            <button className="next_btn">
+            <button className="next_btn" onClick={handleNextClick}>
               <span>
                 <p>Продолжить</p>
                 <img src="/img/arrow.png" alt="" />

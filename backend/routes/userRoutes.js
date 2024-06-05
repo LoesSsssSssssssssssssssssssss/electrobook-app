@@ -4,6 +4,7 @@ const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const multer = require('multer');
+const Progress = require('../models/Progressbar');
 
 // middleware для проверки авторизации пользователя
 const isAuthenticated = (req, res, next) => {
@@ -63,6 +64,7 @@ router.put('/profile', isAuthenticated, async (req, res) => {
   }
 });
 
+//Добавление аватара пользователя
 router.post(
   '/avatar',
   isAuthenticated,
@@ -79,6 +81,122 @@ router.post(
     } catch (error) {
       console.error(error);
       res.status(500).json({ error: 'Failed to upload avatar' });
+    }
+  }
+);
+
+// Создает progress
+router.post('/progress', isAuthenticated, async (req, res) => {
+  const { textbook } = req.body;
+  const userId = req.userId;
+
+  try {
+    // Проверяем, существует ли уже запись прогресса для данного пользователя и учебника
+    const progress = await Progress.findOne({ user: userId, textbook });
+
+    if (progress) {
+      // Запись прогресса существует, возвращаем статус 200
+      res.status(200).json({ message: 'Progress exists' });
+    } else {
+      // Запись прогресса не существует, создаем новую запись и возвращаем статус 201
+      const newProgress = new Progress({
+        user: userId,
+        textbook,
+      });
+      await newProgress.save();
+      res.status(201).json({ message: 'Progress created' });
+    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to create or update progress' });
+  }
+});
+
+//Если прогресс существует true
+router.get('/progress/:userId/:textbookId', async (req, res) => {
+  try {
+    const { userId, textbookId } = req.params;
+    const progress = await Progress.findOne({
+      user: userId,
+      textbook: textbookId,
+    });
+
+    if (progress) {
+      res.json({ exists: true });
+    } else {
+      res.json({ exists: false });
+    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Возвращает progress
+router.get('/progressbook/:userId/:textbookId', async (req, res) => {
+  const userId = req.params.userId;
+  const textbookId = req.params.textbookId;
+
+  try {
+    // Найдем запись прогресса для данного пользователя и учебника
+    const progress = await Progress.findOne({
+      user: userId,
+      textbook: textbookId,
+    });
+
+    if (!progress) {
+      // Если прогресс не найден, возвращаем пустой массив
+      return res.status(200).json({ completedTopics: [] });
+    }
+
+    // Возвращаем массив пройденных пользователем тем
+    res.status(200).json({ completedTopics: progress.completedTopics });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+});
+
+//Добавляет пройденную тему в progress
+router.post(
+  '/increaseProgress/:userId/:textbookId',
+  isAuthenticated,
+  async (req, res) => {
+    const userId = req.params.userId;
+    const textbookId = req.params.textbookId;
+    const topicId = req.body.topicId;
+
+    try {
+      // Находим запись прогресса для данного пользователя и учебника
+      let progress = await Progress.findOne({
+        user: userId,
+        textbook: textbookId,
+      });
+
+      if (!progress) {
+        // Если прогресс не найден, создаем новую запись с начальным значением прогресса
+        progress = new Progress({
+          user: userId,
+          textbook: textbookId,
+          completedTopics: [topicId],
+        });
+      } else {
+        // Проверяем, есть ли уже эта тема в списке пройденных
+        if (progress.completedTopics.includes(topicId)) {
+          return res.status(204).send();
+        }
+        // Если пройденной темы еще нет, добавляем её в список пройденных
+        progress.completedTopics.push(topicId);
+      }
+
+      // Сохраняем изменения в базе данных
+      await progress.save();
+
+      // Возвращаем успешный ответ
+      res.status(200).json({ message: 'Progress increased successfully' });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: 'Failed to increase progress' });
     }
   }
 );

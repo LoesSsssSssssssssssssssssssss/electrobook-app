@@ -86,7 +86,7 @@ function MainPage() {
           )}
         </div>
       </div>
-      <header className="header">
+      <header className="header header_fixed">
         <div className="header_wrapper">
           <Link to="/">
             <img src="/img/logo_min.png" alt="" className="logo_min" />

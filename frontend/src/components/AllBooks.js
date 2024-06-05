@@ -145,95 +145,97 @@ function AllBooks({ isAdmin }) {
       <div>{message}</div>
       <ul>
         {textbooks.map((textbook) => (
-          <li key={textbook._id}>
-            <strong>{textbook.title}</strong>
-            <div>{renderContentWithCodeHighlighting(textbook.description)}</div>
-            {textbook.avatar && (
-              <img
-                src={`http://localhost:5000/${textbook.avatar}`}
-                alt={textbook.title}
-                style={{ maxWidth: '200px' }}
-              />
-            )}
-            {isAdmin && (
-              <div>
-                <label>Добавить аватар:</label>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleFileInputChange}
+          <li key={textbook._id} className="book_li">
+            <div className="book_block">
+              <strong>{textbook.title}</strong>
+              <div>{textbook.description}</div>
+              {textbook.avatar && (
+                <img
+                  src={`http://localhost:5000/${textbook.avatar}`}
+                  alt={textbook.title}
+                  style={{ maxWidth: '200px' }}
                 />
-                <button onClick={() => handleAvatarUpload(textbook._id)}>
-                  Загрузить аватар
-                </button>
-              </div>
-            )}
-            <div>
-              {isAdmin ? (
-                <div>
-                  <button onClick={() => handleDeleteBook(textbook._id)}>
-                    Удалить
-                  </button>
-                  <form
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      handleAddTopic(textbook._id);
-                    }}
-                  >
-                    <div>
-                      <label>Заголовок:</label>
-                      <input
-                        type="text"
-                        value={topicInputs[textbook._id].title}
-                        onChange={(e) =>
-                          handleTopicInputChange(
-                            textbook._id,
-                            'title',
-                            e.target.value
-                          )
-                        }
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label>Содержание:</label>
-                      <textarea
-                        value={topicInputs[textbook._id].content}
-                        onChange={(e) =>
-                          handleTopicInputChange(
-                            textbook._id,
-                            'content',
-                            e.target.value
-                          )
-                        }
-                        rows="4"
-                        required
-                      />
-                    </div>
-                    <button type="submit">Добавить тему</button>
-                  </form>
-                </div>
-              ) : (
-                <></>
               )}
-            </div>
-            {/* Добавляем ссылку на страницу темы */}
-            {selectedTextbookId === textbook._id && (
-              <ul>
-                {textbook.topics.map((topic, index) => (
-                  <li key={index}>
-                    <Link
-                      to={`/textbooks/books/${textbook._id}/topics/${index}`}
+              {isAdmin && (
+                <div>
+                  <label>Добавить аватар:</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileInputChange}
+                  />
+                  <button onClick={() => handleAvatarUpload(textbook._id)}>
+                    Загрузить аватар
+                  </button>
+                </div>
+              )}
+              <div>
+                {isAdmin ? (
+                  <div>
+                    <button onClick={() => handleDeleteBook(textbook._id)}>
+                      Удалить
+                    </button>
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        handleAddTopic(textbook._id);
+                      }}
                     >
-                      {topic.title}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            )}
-            <button onClick={() => handleSelectTextbook(textbook._id)}>
-              Выбрать учебник
-            </button>
+                      <div>
+                        <label>Заголовок:</label>
+                        <input
+                          type="text"
+                          value={topicInputs[textbook._id].title}
+                          onChange={(e) =>
+                            handleTopicInputChange(
+                              textbook._id,
+                              'title',
+                              e.target.value
+                            )
+                          }
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label>Содержание:</label>
+                        <textarea
+                          value={topicInputs[textbook._id].content}
+                          onChange={(e) =>
+                            handleTopicInputChange(
+                              textbook._id,
+                              'content',
+                              e.target.value
+                            )
+                          }
+                          rows="4"
+                          required
+                        />
+                      </div>
+                      <button type="submit">Добавить тему</button>
+                    </form>
+                  </div>
+                ) : (
+                  <></>
+                )}
+              </div>
+              {/* Добавляем ссылку на страницу темы */}
+              {selectedTextbookId === textbook._id && (
+                <ul>
+                  {textbook.topics.map((topic, index) => (
+                    <li key={index}>
+                      <Link
+                        to={`/textbooks/books/${textbook._id}/topics/${index}`}
+                      >
+                        {topic.title}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <button onClick={() => handleSelectTextbook(textbook._id)}>
+                Выбрать учебник
+              </button>
+            </div>
           </li>
         ))}
       </ul>

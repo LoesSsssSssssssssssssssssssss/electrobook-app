@@ -5,13 +5,23 @@ const cors = require('cors');
 const textbookRoutes = require('./routes/textbookRoutes');
 const userRoutes = require('./routes/userRoutes');
 const adminRoutes = require('./routes/adminRoutes');
+const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-app.use('/uploads/textbookAvatars', express.static('uploads/textbookAvatars'));
-app.use('/uploads/categoryImages', express.static('uploads/categoryImages'));
-app.use('/uploads/userAvatars', express.static('uploads/userAvatars'));
+app.use(
+  '/uploads/textbookAvatars',
+  express.static(path.join(__dirname, 'uploads', 'textbookAvatars'))
+);
+app.use(
+  '/uploads/categoryImages',
+  express.static(path.join(__dirname, 'uploads', 'categoryImages'))
+);
+app.use(
+  '/uploads/userAvatars',
+  express.static(path.join(__dirname, 'uploads', 'userAvatars'))
+);
 
 app.use(cors());
 app.use(bodyParser.json());

@@ -1321,6 +1321,43 @@ p > a {
   gap: 25px;
 }
 
+.book_page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+
+.book_add {
+  display: flex;
+  gap: 25px;
+}
+
+.header {
+  position: unset;
+}
+
+.header_fixed {
+  position: fixed;
+}
+
+.li_users {
+  margin-top: 0;
+}
+
+.book_block {
+  box-shadow: 1px 1px 20px -4px rgba(0, 0, 0, 0.25);
+}
+
+.book_page_wrapper {
+  width: 1200px;
+  margin-top: 2%;
+}
+
+.book_li {
+  list-style-type: none;
+}
+
 @media (min-width: 1200px) and (max-width: 1650px) {
   .hello {
     top: 20%;
