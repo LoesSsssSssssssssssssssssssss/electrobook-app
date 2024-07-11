@@ -1,31 +1,33 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 
 const Footer = () => {
   return (
     <>
       <footer className="footer">
-        <a href="#">
-          <img src="/img/logo_min2.png" alt="" className="logo_footer" />
-        </a>
+        <Link to="/">
+          <img
+            src="/img/logo_min2.png"
+            className="logo_footer"
+            alt="logo_footer"
+          />
+        </Link>
         <div className="footer_a_wrapper">
-          <a href="index.html#me" className="footer_a">
+          <a href="/#me" className="footer_a">
             О нас
           </a>
-          <a href="index.html#contact" className="footer_a">
+          <a href="/#contact" className="footer_a">
             Контакты
           </a>
-          <a href="index.html#faq" className="footer_a">
+          <a href="/#faq" className="footer_a">
             FAQ
           </a>
-          <a href="index.html#adv" className="footer_a">
+          <a href="/#adv" className="footer_a">
             Преимущества
           </a>
-          <a href="index.html#rev" className="footer_a">
-            Отзывы
-          </a>
-          <a href="books.html" className="footer_a">
+          <Link to="/bookspage" className="footer_a">
             Учебники
-          </a>
+          </Link>
         </div>
       </footer>
       <div className="copyright">

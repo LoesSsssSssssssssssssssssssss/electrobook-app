@@ -1,6 +1,4 @@
 import { Routes, Route } from 'react-router-dom';
-import Home from './components/Home';
-import AllBooks from './components/AllBooks';
 import TopicDetails from './pages/TopicDetails';
 import AdminPanel from './components/AdminPanel';
 import MainPage from './pages/MainPage';
@@ -21,9 +19,7 @@ export default function AppRoutes() {
   return (
     <Routes>
       <Route path="/" element={<MainPage />} />
-      <Route path="/mainpage" element={<Home />} />
       <Route path="/admin" element={<AdminPanel />} />
-      <Route path="/textbooks" element={<AllBooks />} />
       <Route path="/bookspage" element={<BooksPage />} />
       <Route path="/profile" element={<Profile />} />
       <Route path="/book/:id" element={<Book />} />

@@ -1,29 +1,63 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Modal from '../components/Modal';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
+import { ImExit } from 'react-icons/im';
 
 const Header = () => {
   const [loggedInUsername, setLoggedInUsername] = useState('');
-  const [message, setMessage] = useState('');
   const [checkedAuthStatus, setCheckedAuthStatus] = useState(false);
+  const [avatar, setAvatar] = useState('');
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  const token = localStorage.getItem('token');
+
+  const checkUserRole = useCallback(async () => {
+    try {
+      const response = await axios.get(
+        'https://diplom-backend-mh1r.onrender.com/admin/check-role',
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+      setIsAdmin(response.data.isAdmin);
+    } catch (error) {
+      console.error(error);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    if (token) {
+      checkUserRole();
+    }
+  }, [token, checkUserRole]);
 
   const logout = () => {
-    localStorage.removeItem('token'); // Удаляем токен из локального хранилища
-    setMessage('Logged out');
+    localStorage.removeItem('token');
     setLoggedInUsername('');
+    setAvatar('');
+    setIsAdmin(false);
   };
 
   const handleLoginSuccess = (username) => {
-    setLoggedInUsername(username); // обновляем имя пользователя
+    setLoggedInUsername(username);
   };
 
-  const fetchUsername = async (userId) => {
+  const handleAvatarSet = (avatar) => {
+    setAvatar(avatar);
+  };
+
+  const fetchUserData = async (userId) => {
     try {
-      const response = await axios.get(`http://localhost:5000/user/${userId}`);
+      const response = await axios.get(
+        `https://diplom-backend-mh1r.onrender.com/user/${userId}`
+      );
       setLoggedInUsername(response.data.username);
+      setAvatar(response.data.avatar || '');
     } catch (error) {
-      console.error('Error fetching username:', error);
+      console.error('Error fetching user data:', error);
     }
   };
 
@@ -35,55 +69,80 @@ const Header = () => {
           const payload = JSON.parse(atob(token.split('.')[1]));
 
           if (payload.userId) {
-            await fetchUsername(payload.userId);
+            await fetchUserData(payload.userId);
           }
         } catch (error) {
           console.error('Error parsing token:', error);
         }
       }
-      setCheckedAuthStatus(true); // Устанавливаем, что статус авторизации проверен
+      setCheckedAuthStatus(true);
     };
 
     checkAuthStatus();
   }, []);
+
   return (
     <>
       <header className="header">
         <div className="header_wrapper">
           <Link to="/">
-            <img src="/img/logo_min.png" alt="" className="logo_min" />
+            <img src="/img/logo_min.png" alt="logo" className="logo_min" />
           </Link>
           <div className="header_a_container">
-            <a href="index.html#me" className="header_a">
+            <a href="/#me" className="header_a">
               О нас
             </a>
-            <a href="index.html#contact" className="header_a">
+            <a href="/#contact" className="header_a">
               Контакты
             </a>
-            <a href="index.html#faq" className="header_a">
+            <a href="/#faq" className="header_a">
               FAQ
             </a>
-            <a href="index.html#adv" className="header_a">
+            <a href="/#adv" className="header_a">
               Преимущества
-            </a>
-            <a href="index.html#rev" className="header_a">
-              Отзывы
             </a>
             <Link to="/bookspage" className="header_a">
               Учебники
             </Link>
+            {isAdmin ? (
+              <Link to="/admin" className="header_a">
+                Админ панель
+              </Link>
+            ) : (
+              ''
+            )}
           </div>
 
-          {/* Показываем модальное окно только после того, как проверен статус авторизации */}
           {checkedAuthStatus && (
             <>
               {loggedInUsername ? (
-                <div>
-                  <p>{loggedInUsername}</p>
-                  <button onClick={logout}>Выход</button>
+                <div className="user-info">
+                  {avatar ? (
+                    <Link to="/profile">
+                      <img
+                        src={`https://diplom-backend-mh1r.onrender.com/${avatar}`}
+                        alt="Avatar"
+                        className="user_avatar"
+                        key={avatar}
+                      />
+                    </Link>
+                  ) : (
+                    <div className="user_avatar_none" />
+                  )}
+                  <Link to="/profile" className="username">
+                    {loggedInUsername}
+                  </Link>
+                  <Link to="/" className="logout-icon" onClick={logout}>
+                    <ImExit />
+                  </Link>
                 </div>
               ) : (
-                <Modal onLoginSuccess={handleLoginSuccess} />
+                <Modal
+                  onLoginSuccess={handleLoginSuccess}
+                  handleAvatarSet={handleAvatarSet}
+                >
+                  <button className="header_btn">Начать</button>
+                </Modal>
               )}
             </>
           )}

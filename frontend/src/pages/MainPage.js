@@ -1,40 +1,107 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import '../App.css';
 import Modal from '../components/Modal';
 import Footer from '../components/Footer';
 import HeaderPhone from '../components/HeaderPhone';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
+import { ImExit } from 'react-icons/im';
+
+const UserInfo = React.memo(({ loggedInUsername, avatar, logout }) => (
+  <div className="user-info">
+    {avatar ? (
+      <Link to="/profile">
+        <img
+          src={`http://localhost:5000/${avatar}`}
+          alt="Avatar"
+          className="user_avatar"
+        />
+      </Link>
+    ) : (
+      <div className="user_avatar_none" />
+    )}
+    <Link to="/profile" className="username">
+      {loggedInUsername}
+    </Link>
+    <div className="logout-icon" onClick={logout}>
+      <ImExit />
+    </div>
+  </div>
+));
+
+const AccordionItem = React.memo(
+  ({ item, index, activeIndex, toggleAccordion }) => (
+    <div className="accordion_question" key={index}>
+      <div
+        className="accord_question_header"
+        onClick={() => toggleAccordion(index)}
+      >
+        <p>{item.question}</p>
+        <div className="accordion_toggle">
+          <span className="plus"></span>
+          <span
+            className={`plus ${activeIndex === index ? '' : 'rotate90'}`}
+          ></span>
+        </div>
+      </div>
+      <div
+        className={`accordion_question_answer ${
+          activeIndex === index ? 'max_height' : ''
+        }`}
+      >
+        <p>{item.answer}</p>
+      </div>
+    </div>
+  )
+);
+
+const Accordion = React.memo(({ data, activeIndex, toggleAccordion }) => (
+  <div className="accordion">
+    {data.map((item, index) => (
+      <AccordionItem
+        key={index}
+        item={item}
+        index={index}
+        activeIndex={activeIndex}
+        toggleAccordion={toggleAccordion}
+      />
+    ))}
+  </div>
+));
 
 function MainPage() {
   const [activeIndex, setActiveIndex] = useState(null);
-
-  const toggleAccordion = (index) => {
-    setActiveIndex((prevIndex) => (prevIndex === index ? null : index));
-  };
-
+  const [avatar, setAvatar] = useState('');
   const [loggedInUsername, setLoggedInUsername] = useState('');
   const [message, setMessage] = useState('');
 
-  const handleLoginSuccess = (username) => {
-    setLoggedInUsername(username); // обновляем имя пользователя
-  };
+  const toggleAccordion = useCallback((index) => {
+    setActiveIndex((prevIndex) => (prevIndex === index ? null : index));
+  }, []);
 
-  const fetchUsername = async (userId) => {
+  const handleLoginSuccess = useCallback((username) => {
+    setLoggedInUsername(username);
+  }, []);
+
+  const handleAvatarSet = useCallback((avatar) => {
+    setAvatar(avatar);
+  }, []);
+
+  const fetchUsername = useCallback(async (userId) => {
     try {
       const response = await axios.get(`http://localhost:5000/user/${userId}`);
       setLoggedInUsername(response.data.username);
+      setAvatar(response.data.avatar || '');
     } catch (error) {
       console.error('Error fetching username:', error);
     }
-  };
+  }, []);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (token) {
       try {
         const payload = JSON.parse(atob(token.split('.')[1]));
-
         if (payload.userId) {
           fetchUsername(payload.userId);
         }
@@ -42,36 +109,21 @@ function MainPage() {
         console.error('Error parsing token:', error);
       }
     }
-  }, [message]); // Обновляем при изменении message
+  }, [fetchUsername, message]);
 
-  const logout = () => {
-    localStorage.removeItem('token'); // Удаляем токен из локального хранилища
+  const logout = useCallback(() => {
+    localStorage.removeItem('token');
     setMessage('Logged out');
     setLoggedInUsername('');
-  };
+  }, []);
 
   const accordionData = [
-    {
-      question: 'Подойдет ли учебник, если я уже не новичок?',
-      answer:
-        'Да, учебник расчитан на людей с различной степенью знаний в том или ином языке web-разработки, даже опытный разработчик подчеркнет для себя что-нибудь интересное, век живи - век учись.',
-    },
-    {
-      question: 'Что будет после прохождения учебника?',
-      answer:
-        'После того как вы пройдете один из учебников, в конце у вас появится возможность проверить свои знания и пройти тест.',
-    },
-    {
-      question: 'Актуальна ли информация?',
-      answer:
-        'Да, так как это онлайн учебник, в отличии от бумажных аналогов он постоянно обновляется и следует современным тенденциям web-разработки.',
-    },
-    {
-      question: 'Подойдет ли учебник новичку?',
-      answer:
-        'Да, учебник расчитан на людей любого уровня знания в программировании, в первую очередь на новичков, желающих обучиться web-разработке.',
-    },
+    { question: 'Подойдет ли учебник, если я уже не новичок?', answer: '...' },
+    { question: 'Что будет после прохождения учебника?', answer: '...' },
+    { question: 'Актуальна ли информация?', answer: '...' },
+    { question: 'Подойдет ли учебник новичку?', answer: '...' },
   ];
+
   return (
     <>
       <div className="header_visible">
@@ -80,9 +132,18 @@ function MainPage() {
             <img src="/img/logo.png" alt="" className="logo" />
           </Link>
           {loggedInUsername ? (
-            <p>{loggedInUsername}</p>
+            <UserInfo
+              loggedInUsername={loggedInUsername}
+              avatar={avatar}
+              logout={logout}
+            />
           ) : (
-            <Modal onLoginSuccess={handleLoginSuccess} />
+            <Modal
+              onLoginSuccess={handleLoginSuccess}
+              handleAvatarSet={handleAvatarSet}
+            >
+              <button className="header_btn">Начать</button>
+            </Modal>
           )}
         </div>
       </div>
@@ -92,33 +153,35 @@ function MainPage() {
             <img src="/img/logo_min.png" alt="" className="logo_min" />
           </Link>
           <div className="header_a_container">
-            <a href="index.html#me" className="header_a">
+            <a href="#me" className="header_a">
               О нас
             </a>
-            <a href="index.html#contact" className="header_a">
+            <a href="#contact" className="header_a">
               Контакты
             </a>
-            <a href="index.html#faq" className="header_a">
+            <a href="#faq" className="header_a">
               FAQ
             </a>
-            <a href="index.html#adv" className="header_a">
+            <a href="#adv" className="header_a">
               Преимущества
-            </a>
-            <a href="index.html#rev" className="header_a">
-              Отзывы
             </a>
             <Link to="/bookspage" className="header_a">
               Учебники
             </Link>
           </div>
-
           {loggedInUsername ? (
-            <div>
-              <p>{loggedInUsername}</p>
-              <button onClick={logout}>Выход</button>
-            </div>
+            <UserInfo
+              loggedInUsername={loggedInUsername}
+              avatar={avatar}
+              logout={logout}
+            />
           ) : (
-            <Modal onLoginSuccess={handleLoginSuccess} />
+            <Modal
+              onLoginSuccess={handleLoginSuccess}
+              handleAvatarSet={handleAvatarSet}
+            >
+              <button className="header_btn">Начать</button>
+            </Modal>
           )}
         </div>
       </header>
@@ -135,10 +198,10 @@ function MainPage() {
                 Интерактивный, простой и созданный для вас
               </div>
               <div className="win_btn">
-                <p>Курсы</p>
-                <a href="books.html">
+                <p>Учебники</p>
+                <Link to="/bookspage">
                   <img src="/img/courser.png" alt="" />
-                </a>
+                </Link>
               </div>
             </div>
             <div className="right_window">
@@ -152,12 +215,12 @@ function MainPage() {
               <div className="content_box">
                 Этот учебник включает в себя все популярные языки
                 веб-разработки: JavaScript, HTML, CSS и популярные платформы для
-                работы такие как: NodeJS, React, Electron и др.
+                работы такие как: NodeJS, React и др.
               </div>
               <button className="courser_btn">
                 <span>
                   <p>
-                    <a href="books.html">К курсам</a>
+                    <Link to="/bookspage">К учебникам</Link>
                   </p>
                   <img src="/img/arrow.png" alt="" />
                 </span>
@@ -241,190 +304,20 @@ function MainPage() {
             </div>
           </div>
         </div>
-        <div className="fon2" id="rev">
-          <div className="reviw_title">Отзывы</div>
-          <div className="fon2_row">
-            <div className="fon2_row_block">
-              <div className="review">
-                Повседневная практика показывает, что дальнейшее развитие
-                различных форм деятельности представляет собой интересный
-                эксперимент проверки позиций, занимаемых.форм деятельности
-                представляет собой интересный эксперимент.
-              </div>
-              <div className="review_avtor">
-                <div className="review_avtor_img">
-                  <img src="/img/avatar.png" alt="" />
-                  <h3>Роберт Дауни</h3>
-                </div>
-              </div>
-            </div>
-            <div className="fon2_row_block">
-              <div className="review">
-                Повседневная практика показывает, что дальнейшее развитие
-                различных форм деятельности представляет собой интересный
-                эксперимент проверки позиций, занимаемых.форм деятельности
-                представляет собой интересный эксперимент.
-              </div>
-              <div className="review_avtor">
-                <div className="review_avtor_img">
-                  <img src="/img/avatar.png" alt="" />
-                  <h3>Роберт Дауни</h3>
-                </div>
-              </div>
-            </div>
-            <div className="fon2_row_block">
-              <div className="review">
-                Повседневная практика показывает, что дальнейшее развитие
-                различных форм деятельности представляет собой интересный
-                эксперимент проверки позиций, занимаемых.форм деятельности
-                представляет собой интересный эксперимент.
-              </div>
-              <div className="review_avtor">
-                <div className="review_avtor_img">
-                  <img src="/img/avatar.png" alt="" />
-                  <h3>Роберт Дауни</h3>
-                </div>
-              </div>
-            </div>
-            <div className="fon2_row_block">
-              <div className="review">
-                Повседневная практика показывает, что дальнейшее развитие
-                различных форм деятельности представляет собой интересный
-                эксперимент проверки позиций, занимаемых.форм деятельности
-                представляет собой интересный эксперимент.
-              </div>
-              <div className="review_avtor">
-                <div className="review_avtor_img">
-                  <img src="/img/avatar.png" alt="" />
-                  <h3>Роберт Дауни</h3>
-                </div>
-              </div>
-            </div>
-            <div className="fon2_row_block">
-              <div className="review">
-                Повседневная практика показывает, что дальнейшее развитие
-                различных форм деятельности представляет собой интересный
-                эксперимент проверки позиций, занимаемых.форм деятельности
-                представляет собой интересный эксперимент.
-              </div>
-              <div className="review_avtor">
-                <div className="review_avtor_img">
-                  <img src="/img/avatar.png" alt="" />
-                  <h3>Роберт Дауни</h3>
-                </div>
-              </div>
-            </div>
-            <div className="fon2_row_block">
-              <div className="review">
-                Повседневная практика показывает, что дальнейшее развитие
-                различных форм деятельности представляет собой интересный
-                эксперимент проверки позиций, занимаемых.форм деятельности
-                представляет собой интересный эксперимент.
-              </div>
-              <div className="review_avtor">
-                <div className="review_avtor_img">
-                  <img src="/img/avatar.png" alt="" />
-                  <h3>Роберт Дауни</h3>
-                </div>
-              </div>
-            </div>
-            <div className="fon2_row_block">
-              <div className="review">
-                Повседневная практика показывает, что дальнейшее развитие
-                различных форм деятельности представляет собой интересный
-                эксперимент проверки позиций, занимаемых.форм деятельности
-                представляет собой интересный эксперимент.
-              </div>
-              <div className="review_avtor">
-                <div className="review_avtor_img">
-                  <img src="/img/avatar.png" alt="" />
-                  <h3>Роберт Дауни</h3>
-                </div>
-              </div>
-            </div>
-            <div className="fon2_row_block">
-              <div className="review">
-                Повседневная практика показывает, что дальнейшее развитие
-                различных форм деятельности представляет собой интересный
-                эксперимент проверки позиций, занимаемых.форм деятельности
-                представляет собой интересный эксперимент.
-              </div>
-              <div className="review_avtor">
-                <div className="review_avtor_img">
-                  <img src="/img/avatar.png" alt="" />
-                  <h3>Роберт Дауни</h3>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="fon2_row2">
-            <div className="fon2_row_block">
-              <div className="review">
-                Повседневная практика показывает, что дальнейшее развитие
-                различных форм деятельности представляет собой интересный
-                эксперимент проверки позиций, занимаемых.форм деятельности
-                представляет собой интересный эксперимент.
-              </div>
-              <div className="review_avtor">
-                <div className="review_avtor_img">
-                  <img src="/img/avatar2.png" alt="" />
-                  <h3>Роберт Дауни</h3>
-                </div>
-              </div>
-            </div>
-            <div className="fon2_row_block">
-              <div className="review">
-                Повседневная практика показывает, что дальнейшее развитие
-                различных форм деятельности представляет собой интересный
-                эксперимент проверки позиций, занимаемых.форм деятельности
-                представляет собой интересный эксперимент.
-              </div>
-              <div className="review_avtor">
-                <div className="review_avtor_img">
-                  <img src="/img/avatar2.png" alt="" />
-                  <h3>Роберт Дауни</h3>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
         <div className="wrapper">
           <div className="invite" id="faq">
             <p>
-              Готовы начать свое обучение <br />
-              уже сегодня?
+              Готовы начать свое обучение <br /> уже сегодня?
             </p>
             <button>
-              <a href="books.html">Начать сейчас</a>
+              <Link to="/bookspage">Начать сейчас</Link>
             </button>
           </div>
-          <div className="accordion">
-            {accordionData.map((item, index) => (
-              <div className="accordion_question" key={index}>
-                <div
-                  className="accord_question_header"
-                  onClick={() => toggleAccordion(index)}
-                >
-                  <p>{item.question}</p>
-                  <div className="accordion_toggle">
-                    <span className="plus"></span>
-                    <span
-                      className={`plus ${
-                        activeIndex === index ? '' : 'rotate90'
-                      }`}
-                    ></span>
-                  </div>
-                </div>
-                <div
-                  className={`accordion_question_answer ${
-                    activeIndex === index ? 'max_height' : ''
-                  }`}
-                >
-                  <p>{item.answer}</p>
-                </div>
-              </div>
-            ))}
-          </div>
+          <Accordion
+            data={accordionData}
+            activeIndex={activeIndex}
+            toggleAccordion={toggleAccordion}
+          />
           <div className="contact">
             <p>
               Присоединяйтесь <br />к нам
@@ -432,7 +325,7 @@ function MainPage() {
             <button className="invite_btn">
               <span>
                 <p>
-                  <a href="books.html">Присоединиться</a>
+                  <Link to="/bookspage">Присоединиться</Link>
                 </p>
                 <img src="/img/arrow.png" alt="" />
               </span>

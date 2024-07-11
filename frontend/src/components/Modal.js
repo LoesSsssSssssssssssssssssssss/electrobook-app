@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 
-const Modal = ({ onLoginSuccess }) => {
+const Modal = ({ children, onLoginSuccess, handleAvatarSet }) => {
   const [isRegistration, setIsRegistration] = useState(true);
   const [isModalVisible, setIsModalVisible] = useState(false);
 
@@ -18,6 +18,7 @@ const Modal = ({ onLoginSuccess }) => {
 
   const handleSwitchMode = () => {
     setIsRegistration(!isRegistration);
+    setMessage('');
   };
 
   const modalContentRegClass = isRegistration ? '' : 'display_none';
@@ -31,15 +32,59 @@ const Modal = ({ onLoginSuccess }) => {
   };
 
   const handleModalClick = (e) => {
-    e.stopPropagation(); // Остановить всплытие события
+    e.stopPropagation();
   };
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [email, setEmail] = useState('');
+  const [agreeToTerms, setAgreeToTerms] = useState(false);
   const [message, setMessage] = useState('');
 
+  const validateEmail = (email) => {
+    const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return re.test(email);
+  };
+
+  const validatePassword = (password) => {
+    const re = /^(?=.*\d).{4,}$/;
+    return re.test(password);
+  };
+
+  const validateUsername = (username) => {
+    const re = /^[А-Яа-яЁё\s]+$/;
+    return re.test(username);
+  };
+
   const register = async () => {
+    if (!validateUsername(username)) {
+      setMessage('Имя может содержать только кириллицу и пробелы');
+      return;
+    }
+
+    if (!validateEmail(email)) {
+      setMessage('Некорректный формат почты');
+      return;
+    }
+
+    if (!validatePassword(password)) {
+      setMessage(
+        'Пароль должен быть минимум 4 символа и содержать хотя бы одну цифру'
+      );
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setMessage('Пароли не совпадают');
+      return;
+    }
+
+    if (!agreeToTerms) {
+      setMessage('Вы должны согласиться на обработку персональных данных');
+      return;
+    }
+
     try {
       const response = await axios.post('http://localhost:5000/user/register', {
         username,
@@ -62,8 +107,10 @@ const Modal = ({ onLoginSuccess }) => {
       setMessage(`Logged in! Token: ${response.data.token}`);
       const token = response.data.token;
       const name = response.data.username;
+      const avatar = response.data.avatar;
       localStorage.setItem('token', token);
       onLoginSuccess(name);
+      handleAvatarSet(avatar);
     } catch (error) {
       setMessage(error.response.data.error);
     }
@@ -71,9 +118,7 @@ const Modal = ({ onLoginSuccess }) => {
 
   return (
     <>
-      <button className="header_btn" onClick={toggleModal}>
-        Начать
-      </button>
+      {children && React.cloneElement(children, { onClick: toggleModal })}
 
       {isModalVisible && (
         <div className="modal-overlay" onClick={handleOverlayClick}>
@@ -121,7 +166,24 @@ const Modal = ({ onLoginSuccess }) => {
                       className="modal_input"
                       placeholder="Повторите пароль"
                       autoComplete="new-password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
                     />
+                  </div>
+                  <div className="checkbox_wrapper">
+                    <input
+                      type="checkbox"
+                      id="agreeToTerms"
+                      className="modal_checkbox"
+                      checked={agreeToTerms}
+                      onChange={(e) => setAgreeToTerms(e.target.checked)}
+                    />
+                    <label
+                      htmlFor="agreeToTerms"
+                      className="modal_checkbox_label"
+                    >
+                      Даю согласие на обработку персональных данных
+                    </label>
                   </div>
                   <button className="profile_book_btn" onClick={register}>
                     Продолжить
@@ -163,7 +225,6 @@ const Modal = ({ onLoginSuccess }) => {
                     Продолжить
                   </button>
                   <div className="auth">
-                    <p style={{ cursor: 'pointer' }}>Забыли пароль?</p>
                     <p>Нет аккаунта?</p>
                     <button className="svap2" onClick={handleSwitchMode}>
                       Регистрация
