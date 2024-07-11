@@ -6,6 +6,7 @@ const textbookRoutes = require('./routes/textbookRoutes');
 const userRoutes = require('./routes/userRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const path = require('path');
+require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -28,9 +29,7 @@ app.use(bodyParser.json());
 
 // Подключение к MongoDB
 mongoose
-  .connect(
-    'mongodb+srv://ispr220:book@electronicbooks.mrtthhg.mongodb.net/?retryWrites=true&w=majority&appName=electronicbooks'
-  )
+  .connect(process.env.MONGODB_URI)
   .then(() => {
     console.log('Connected to MongoDB');
   })

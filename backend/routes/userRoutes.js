@@ -5,6 +5,9 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const multer = require('multer');
 const Progress = require('../models/Progressbar');
+const Textbook = require('../models/Textbook');
+const mongoose = require('mongoose');
+require('dotenv').config();
 
 // middleware для проверки авторизации пользователя
 const isAuthenticated = (req, res, next) => {
@@ -13,13 +16,90 @@ const isAuthenticated = (req, res, next) => {
     return res.status(401).json({ error: 'Unauthorized' });
   }
   try {
-    const decoded = jwt.verify(token, 'secret_key');
+    const decoded = jwt.verify(token, process.env.SECRET_KEY);
     req.userId = decoded.userId;
     next();
   } catch (error) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 };
+
+const validateEmail = (email) => {
+  const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return re.test(email);
+};
+
+const validatePassword = (password) => {
+  const re = /^(?=.*\d).{4,}$/;
+  return re.test(password);
+};
+
+const validateUsername = (username) => {
+  const re = /^[А-Яа-яЁё\s]+$/;
+  return re.test(username);
+};
+
+// Маршрут для получения активных и завершенных учебников
+router.get('/books', isAuthenticated, async (req, res) => {
+  try {
+    const userId = req.userId;
+
+    // Получаем прогресс пользователя
+    const progressRecords = await Progress.find({ user: userId }).populate(
+      'textbook'
+    );
+
+    const activeBooks = [];
+    const completedBooks = [];
+
+    progressRecords.forEach((progress) => {
+      const completedTopics = progress.completedTopics.length;
+      const totalTopics = progress.textbook.topics.length;
+
+      if (totalTopics === 0) {
+        console.error(`Textbook ${progress.textbook.title} has no topics`);
+      }
+
+      if (completedTopics === totalTopics) {
+        completedBooks.push({
+          id: progress.textbook._id,
+          title: progress.textbook.title,
+          description: progress.textbook.description,
+          avatar: progress.textbook.avatar,
+          totalTopics: totalTopics,
+          completedTopics: completedTopics,
+          isVisible: progress.textbook.isVisible,
+        });
+      } else {
+        activeBooks.push({
+          id: progress.textbook._id,
+          title: progress.textbook.title,
+          description: progress.textbook.description,
+          avatar: progress.textbook.avatar,
+          totalTopics: totalTopics,
+          completedTopics: completedTopics,
+          isVisible: progress.textbook.isVisible,
+        });
+      }
+    });
+
+    // Фильтрация учебников по статусу видимости
+    const visibleActiveBooks = activeBooks.filter(
+      (book) => book.isVisible === true
+    );
+    const visibleCompletedBooks = completedBooks.filter(
+      (book) => book.isVisible === true
+    );
+
+    res.json({
+      activeBooks: visibleActiveBooks,
+      completedBooks: visibleCompletedBooks,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to fetch books' });
+  }
+});
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
@@ -54,9 +134,14 @@ router.put('/profile', isAuthenticated, async (req, res) => {
     if (username) updatedData.username = username;
     if (email) updatedData.email = email;
     if (phone) updatedData.phone = phone;
-    const updatedUser = await User.findByIdAndUpdate(req.userId, updatedData, {
-      new: true,
-    });
+    const updatedUser = await User.findOneAndUpdate(
+      { _id: req.userId },
+      updatedData,
+      {
+        new: true,
+      }
+    );
+
     res.json(updatedUser);
   } catch (error) {
     console.error(error);
@@ -84,6 +169,29 @@ router.post(
     }
   }
 );
+
+router.post('/resetProgress', isAuthenticated, async (req, res) => {
+  const { textbookId } = req.body;
+  const userId = req.userId;
+
+  try {
+    const progress = await Progress.findOne({
+      user: userId,
+      textbook: textbookId,
+    });
+    if (!progress) {
+      return res.status(404).json({ error: 'Progress not found' });
+    }
+
+    progress.completedTopics = [];
+    await progress.save();
+
+    res.status(200).json({ message: 'Progress reset successfully' });
+  } catch (error) {
+    console.error('Failed to reset progress:', error);
+    res.status(500).json({ error: 'Failed to reset progress' });
+  }
+});
 
 // Создает progress
 router.post('/progress', isAuthenticated, async (req, res) => {
@@ -138,18 +246,15 @@ router.get('/progressbook/:userId/:textbookId', async (req, res) => {
   const textbookId = req.params.textbookId;
 
   try {
-    // Найдем запись прогресса для данного пользователя и учебника
     const progress = await Progress.findOne({
       user: userId,
       textbook: textbookId,
     });
 
     if (!progress) {
-      // Если прогресс не найден, возвращаем пустой массив
       return res.status(200).json({ completedTopics: [] });
     }
 
-    // Возвращаем массив пройденных пользователем тем
     res.status(200).json({ completedTopics: progress.completedTopics });
   } catch (error) {
     console.error(error);
@@ -167,32 +272,27 @@ router.post(
     const topicId = req.body.topicId;
 
     try {
-      // Находим запись прогресса для данного пользователя и учебника
       let progress = await Progress.findOne({
         user: userId,
         textbook: textbookId,
       });
 
       if (!progress) {
-        // Если прогресс не найден, создаем новую запись с начальным значением прогресса
         progress = new Progress({
           user: userId,
           textbook: textbookId,
           completedTopics: [topicId],
         });
       } else {
-        // Проверяем, есть ли уже эта тема в списке пройденных
         if (progress.completedTopics.includes(topicId)) {
           return res.status(204).send();
         }
-        // Если пройденной темы еще нет, добавляем её в список пройденных
+
         progress.completedTopics.push(topicId);
       }
 
-      // Сохраняем изменения в базе данных
       await progress.save();
 
-      // Возвращаем успешный ответ
       res.status(200).json({ message: 'Progress increased successfully' });
     } catch (error) {
       console.error(error);
@@ -201,16 +301,139 @@ router.post(
   }
 );
 
-//Регистрация пользователя
+router.get('/count/:textbookId', async (req, res) => {
+  const textbookId = req.params.textbookId;
+
+  try {
+    const count = await Progress.countDocuments({ textbook: textbookId });
+    res.status(200).json({ count });
+  } catch (error) {
+    console.error('Error fetching user count for textbook:', error);
+    res.status(500).json({ error: 'Failed to fetch user count' });
+  }
+});
+
+router.post('/rate', isAuthenticated, async (req, res) => {
+  const { textbookId, rating } = req.body;
+  const userId = req.userId;
+
+  // Проверка валидности рейтинга
+  if (rating < 1 || rating > 5) {
+    return res.status(400).json({ error: 'Rating must be between 1 and 5' });
+  }
+
+  try {
+    const textbook = await Textbook.findById(textbookId);
+
+    // Проверяем, найден ли учебник
+    if (!textbook) {
+      return res.status(404).json({ error: 'Textbook not found' });
+    }
+
+    // Находим существующую оценку пользователя для этого учебника
+    const userRatingIndex = textbook.ratings.findIndex((r) =>
+      r.user.equals(userId)
+    );
+
+    if (userRatingIndex !== -1) {
+      // Если оценка пользователя уже существует, обновляем её
+      textbook.ratings[userRatingIndex].rating = rating;
+    } else {
+      // Если оценки пользователя нет, добавляем новую оценку
+      textbook.ratings.push({ user: userId, rating });
+    }
+
+    await textbook.save();
+
+    res.status(200).json({ message: 'Rating added or updated successfully' });
+  } catch (error) {
+    console.error('Failed to add or update rating:', error);
+    res.status(500).json({ error: 'Failed to add or update rating' });
+  }
+});
+
+router.get('/rating/:textbookId', async (req, res) => {
+  try {
+    const { textbookId } = req.params;
+
+    const textbook = await Textbook.findById(textbookId);
+
+    if (!textbook) {
+      return res.status(404).json({ error: 'Учебник не найден' });
+    }
+
+    // Находим среднюю оценку
+    const totalRatings = textbook.ratings.length;
+    const sumRatings = textbook.ratings.reduce((sum, r) => sum + r.rating, 0);
+    const averageRating = totalRatings === 0 ? 0 : sumRatings / totalRatings;
+
+    res.status(200).json({
+      averageRating: averageRating.toFixed(2),
+    });
+  } catch (error) {
+    console.error('Ошибка при получении рейтинга:', error);
+    res.status(500).json({ error: 'Не удалось получить рейтинг' });
+  }
+});
+
+router.get('/userRating/:textbookId', isAuthenticated, async (req, res) => {
+  try {
+    const { textbookId } = req.params;
+    const userId = req.userId;
+
+    const textbook = await Textbook.findById(textbookId);
+
+    if (!textbook) {
+      return res.status(404).json({ error: 'Учебник не найден' });
+    }
+
+    // Находим среднюю оценку
+    const totalRatings = textbook.ratings.length;
+    const sumRatings = textbook.ratings.reduce((sum, r) => sum + r.rating, 0);
+    const averageRating = totalRatings === 0 ? 0 : sumRatings / totalRatings;
+
+    // Находим оценку конкретного пользователя для учебника
+    const userRating = textbook.ratings.find((r) => r.user.equals(userId));
+
+    res.status(200).json({
+      averageRating: averageRating.toFixed(2),
+      userRating: userRating ? userRating.rating : null,
+    });
+  } catch (error) {
+    console.error('Ошибка при получении рейтинга:', error);
+    res.status(500).json({ error: 'Не удалось получить рейтинг' });
+  }
+});
+
+// Регистрация пользователя
 router.post('/register', async (req, res) => {
   try {
     const { username, password, email, role } = req.body;
-    const existingUser = await User.findOne({ username });
+
+    if (!validateUsername(username)) {
+      return res
+        .status(400)
+        .json({ error: 'Имя может содержать только кириллицу и пробелы' });
+    }
+
+    if (!validateEmail(email)) {
+      return res.status(400).json({ error: 'Некорректный формат почты' });
+    }
+
+    if (!validatePassword(password)) {
+      return res.status(400).json({
+        error:
+          'Пароль должен быть минимум 4 символа и содержать хотя бы одну цифру',
+      });
+    }
+
+    const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res
         .status(400)
-        .json({ error: 'User with this username already exists' });
+        .json({ error: 'Пользователь с такой почтой уже существует' });
     }
+
     const hashedPassword = await bcrypt.hash(password, 10);
     const user = new User({ username, password: hashedPassword, email, role });
     await user.save();
@@ -224,6 +447,10 @@ router.post('/register', async (req, res) => {
 router.get('/:userId', async (req, res) => {
   const { userId } = req.params;
 
+  if (!mongoose.Types.ObjectId.isValid(userId)) {
+    return res.status(400).json({ error: 'Invalid userId' });
+  }
+
   try {
     const user = await User.findById(userId);
 
@@ -231,7 +458,7 @@ router.get('/:userId', async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    res.json({ username: user.username });
+    res.json({ username: user.username, avatar: user.avatar });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Failed to fetch username' });
@@ -244,16 +471,16 @@ router.post('/login', async (req, res) => {
     const { email, password } = req.body;
     const user = await User.findOne({ email });
     if (!user) {
-      throw new Error('User not found');
+      return res.status(401).json({ error: 'Неверный email или пароль' });
     }
     const passwordMatch = await bcrypt.compare(password, user.password);
     if (!passwordMatch) {
-      throw new Error('Invalid credentials');
+      return res.status(401).json({ error: 'Неверный email или пароль' });
     }
-    const token = jwt.sign({ userId: user._id }, 'secret_key');
-    res.json({ token, username: user.username });
+    const token = jwt.sign({ userId: user._id }, process.env.SECRET_KEY);
+    res.json({ token, username: user.username, avatar: user.avatar });
   } catch (error) {
-    res.status(401).json({ error: error.message });
+    res.status(500).json({ error: 'Авторизация не удалась' });
   }
 });
 
